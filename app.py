@@ -20,27 +20,24 @@ from langchain_core.prompts import PromptTemplate       # LLM'e vereceğimiz tal
 from langchain_core.runnables import RunnablePassthrough # Zincir içinde kullanıcı sorusunu değiştirmeden aktarmak için
 from langchain_core.output_parsers import StrOutputParser # LLM'in cevabını temiz bir metne (string) dönüştürmek için
 # ==============================================================================
-# GOOGLE API ANAHTARI AYARI (LOKAL/DEPLOYMENT İÇİN DÜZELTİLDİ)
+# GOOGLE API ANAHTARI AYARI 
 # ==============================================================================
 
 # Bu fonksiyon, UYGULAMANIN NEREDE ÇALIŞTIĞINI KONTROL EDER.
-# Streamlit Cloud'daysa, 'st.secrets'tan anahtarı okur.
-# Lokal (senin bilgisayarın) ise, kenar çubuğunda metin kutusunu gösterir.
+# hasattr(st, "secrets") kodu, 'st' nesnesinin 'secrets' diye bir 
+# özelliği var mı diye bakar. Bu özellik SADECE Streamlit Cloud'da mevcuttur.
+# Bu, lokalde çökmeyi engelleyen en güvenli yöntemdir.
 
 def get_google_api_key():
-    # 'os.environ.get' ile ortam değişkenlerini kontrol ediyoruz.
-    # "STREAMLIT_SHARING_MODE" değişkeni SADECE Streamlit Cloud'da "True" olur.
-    # Bu kontrol, st.secrets'ı lokalde aramayı engeller ve çökmeyi önler.
-    if os.environ.get('STREAMLIT_SHARING_MODE') == 'True':
-        # Streamlit Cloud'da çalışıyoruz, Secrets'tan anahtarı al
-        try:
-            return st.secrets["GOOGLE_API_KEY"]
-        except KeyError:
-            # Secrets'ta anahtarın unutulması durumuna karşı bir hata
-            st.error("HATA: Streamlit Cloud Secrets'ta 'GOOGLE_API_KEY' bulunamadı!")
-            st.stop()
+    # Python'un 'short-circuit' özelliği sayesinde, eğer 'hasattr' False ise
+    # (yani lokaldeysek), 'and'in sağ tarafını (st.secrets'ı)
+    # hiç kontrol etmez ve hata vermez.
+    if hasattr(st, "secrets") and "GOOGLE_API_KEY" in st.secrets:
+        # Streamlit Cloud'da çalışıyoruz VE anahtar secrets'ta var
+        return st.secrets["GOOGLE_API_KEY"]
     else:
-        # Lokal'de çalışıyoruz, kenar çubuğundan anahtarı iste
+        # Lokal'de çalışıyoruz VEYA secrets'ta anahtar yoksa
+        # (Her ihtimale karşı lokaldeki kutuyu göster)
         return st.sidebar.text_input(
             "Google API Anahtarınızı Buraya Yapıştırın:",
             type="password",
