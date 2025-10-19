@@ -1,0 +1,12 @@
+# Sanal ortamı ve OS'e özel dosyaları görmezden gel
+venv/
+.venv/
+.DS_Store
+
+# Python cache dosyalarını görmezden gel
+*.pyc
+__pycache__/
+
+# Zip dosyalarını görmezden gel
+*.zip
+chroma_db_GUNCEL.zip
