@@ -9,8 +9,6 @@ import pandas as pd       # (Bu kodda doğrudan kullanılmıyor ama genellikle v
 from tqdm import tqdm     # (Bu kodda doğrudan kullanılmıyor, Colab'de kullanılmıştı)
 
 # --- LangChain Kütüphaneleri ---
-# Colab notebook'unda RAG zincirini kurarken kullandığımız
-# tüm temel bileşenleri buraya da import ediyoruz.
 from langchain_text_splitters import RecursiveCharacterTextSplitter # (Bu dosyada gerek yok ama zararı da yok)
 from langchain_core.documents import Document                     # (Bu dosyada gerek yok ama zararı da yok)
 from langchain_chroma import Chroma                     # Diskten 'chroma_db' veritabanını yüklemek için
@@ -19,25 +17,36 @@ from langchain_google_genai import ChatGoogleGenerativeAI # RAG zincirinin beyni
 from langchain_core.prompts import PromptTemplate       # LLM'e vereceğimiz talimat şablonu (Prompt) için
 from langchain_core.runnables import RunnablePassthrough # Zincir içinde kullanıcı sorusunu değiştirmeden aktarmak için
 from langchain_core.output_parsers import StrOutputParser # LLM'in cevabını temiz bir metne (string) dönüştürmek için
+
 # ==============================================================================
-# GOOGLE API ANAHTARI AYARI 
+# YENİ EKLENDİ: KENAR ÇUBUĞU (SIDEBAR) HAKKINDA KUTUSU
+# ==============================================================================
+st.sidebar.title("Proje Hakkında ℹ️")
+st.sidebar.info(
+    "Bu chatbot, Akbank GenAI Bootcamp projesi için geliştirilmiştir.\n\n"
+    "RAG (Retrieval-Augmented Generation) mimarisi kullanılarak, "
+    "şarkı sözlerinin bir kısmını yazdığınızda o şarkının adını, "
+    "sanatçısını ve türünü bulur."
+)
+st.sidebar.markdown("---") # Ayırıcı çizgi
+
+# ==============================================================================
+# GOOGLE API ANAHTARI AYARI (DEPLOY İÇİN SON VERSİYON: TRY-EXCEPT)
 # ==============================================================================
 
-# Bu fonksiyon, UYGULAMANIN NEREDE ÇALIŞTIĞINI KONTROL EDER.
-# hasattr(st, "secrets") kodu, 'st' nesnesinin 'secrets' diye bir 
-# özelliği var mı diye bakar. Bu özellik SADECE Streamlit Cloud'da mevcuttur.
-# Bu, lokalde çökmeyi engelleyen en güvenli yöntemdir.
+# Bu fonksiyon, en basit ve en sağlam yöntemi kullanır:
+# 1. 'st.secrets'tan anahtarı okumayı Dener (try).
+# 2. Başarılı olursa (Cloud'dayız demektir), anahtarı döndürür.
+# 3. Hata alırsa (Lokal'deyiz demektir),
+#    kenar çubuğundaki metin kutusunu gösterir.
 
 def get_google_api_key():
-    # Python'un 'short-circuit' özelliği sayesinde, eğer 'hasattr' False ise
-    # (yani lokaldeysek), 'and'in sağ tarafını (st.secrets'ı)
-    # hiç kontrol etmez ve hata vermez.
-    if hasattr(st, "secrets") and "GOOGLE_API_KEY" in st.secrets:
-        # Streamlit Cloud'da çalışıyoruz VE anahtar secrets'ta var
+    try:
+        # Önce Streamlit Cloud Secrets'ı okumayı DENE
         return st.secrets["GOOGLE_API_KEY"]
-    else:
-        # Lokal'de çalışıyoruz VEYA secrets'ta anahtar yoksa
-        # (Her ihtimale karşı lokaldeki kutuyu göster)
+    except:
+        # Eğer 'secrets' yoksa (Lokal) veya anahtar tanımlı değilse:
+        # Kenar çubuğundan (Lokal) anahtarı iste
         return st.sidebar.text_input(
             "Google API Anahtarınızı Buraya Yapıştırın:",
             type="password",
@@ -53,7 +62,7 @@ if api_key:
     # 'os.environ' (ortam değişkeni) içine ata.
     os.environ["GOOGLE_API_KEY"] = api_key
 else:
-    # Eğer kullanıcı henüz bir anahtar girmemişse (ve Secrets'ta da yoksa):
+    # Eğer kullanıcı henüz bir anahtar girmemişse (veya Secrets'ta da yoksa):
     # Sol kenar çubuğuna bir uyarı koy
     st.sidebar.warning("Lütfen sol kenar çubuğundan Google API anahtarlarınızı girin.")
     # Anahtarı girmeden uygulamanın geri kalanının çalışmasını durdur
@@ -64,13 +73,6 @@ else:
 # ==============================================================================
 
 # @st.cache_resource: Bu, Streamlit için HAYATİ bir optimizasyon komutudur.
-# Bu 'decorator', altındaki 'load_rag_chain' fonksiyonunun SADECE BİR KEZ
-# çalışmasını ve sonucunu (kurulan 'rag_chain') hafızada (cache) tutmasını sağlar.
-#
-# EĞER BU OLMASAYDI: Kullanıcı her soru sorduğunda, Streamlit tüm 'app.py'
-# dosyasını baştan çalıştırır ve her seferinde modeli + veritabanını
-# yeniden yüklerdi. Bu da saniyeler süren yavaş bir uygulama demekti.
-# @st.cache_resource sayesinde model ve DB bir kez yüklenir, anında cevap alınır.
 @st.cache_resource
 def load_rag_chain():
     """
@@ -82,7 +84,6 @@ def load_rag_chain():
     st.sidebar.info("RAG Zinciri ve Model Yükleniyor...")
     
     # --- 1. Retriever'ı Kur (Veritabanı Yükleme) ---
-    # Colab'de 'chroma_db'yi oluştururken kullandığımız modelin aynısı olmalı.
     model_name = "sentence-transformers/all-MiniLM-L6-v2"
     embeddings = HuggingFaceEmbeddings(model_name=model_name)
     
@@ -100,11 +101,9 @@ def load_rag_chain():
     vectorstore = Chroma(persist_directory="chroma_db", embedding_function=embeddings)
     
     # Optimize ettiğimiz en iyi ayar (Colab Hücre 4'teki gibi):
-    # Kullanıcının sorusuna en çok benzeyen 'k=1' (en iyi 1) sonucu getir.
     retriever = vectorstore.as_retriever(search_kwargs={"k": 1}) 
     
     # --- 2. Prompt'u Kur (Colab Hücre 4'teki gibi) ---
-    # LLM'e (Gemini) vereceğimiz talimat şablonu.
     template = """
     Sana verilen Bağlam'ı kullanarak kullanıcının Soru'sunu cevapla. Cevabını SADECE bu bağlamdaki bilgilere dayanarak ver. Eğer bağlamda cevap yoksa, 'Bu konuda bilgim yok.' de.
     Bağlam:
@@ -115,11 +114,9 @@ def load_rag_chain():
     prompt = PromptTemplate.from_template(template)
 
     # --- 3. LLM'i Kur (Colab Hücre 4'teki gibi) ---
-    # 'gemini-pro-latest' günlük 50 limitine takılabilir.
     llm = ChatGoogleGenerativeAI(model="gemini-pro-latest", temperature=0)
 
     # --- 4. Zinciri (Chain) Oluştur (Colab Hücre 4'teki gibi) ---
-    # LangChain Expression Language (LCEL) kullanarak boru hattını tanımla.
     rag_chain = (
         {"context": retriever, "question": RunnablePassthrough()}  # Adım 1: Context'i bul, soruyu aktar
         | prompt                                                   # Adım 2: Prompt'u doldur
@@ -133,36 +130,53 @@ def load_rag_chain():
     return rag_chain # Hafızaya (cache) alınacak olan RAG zincirini döndür.
 
 # ==============================================================================
-# WEB ARAYÜZÜ (STREAMLIT)
-# Amaç: Kullanıcının göreceği ve etkileşime gireceği arayüzü çizdirmek.
+# WEB ARAYÜZÜ (STREAMLIT) - TASARIM GÜNCELLENDİ
 # ==============================================================================
 
-# st.markdown: Ekrana metin (veya HTML) basar.
-# 'unsafe_allow_html=True', <style> ve <h1> gibi HTML etiketlerini
-# kullanmamıza izin verir (Başlığı küçültmek için).
+# YENİ EKLENDİ: Başlığı ortalamak ve stilleri iyileştirmek için HTML/CSS
 st.markdown("""
 <style>
 h1 {
-    font-size: 2.0rem !important;
+    font-size: 2.0rem   !important; /* Başlığı biraz büyüttüm */
+    text-align: center;          /* BAŞLIĞI ORTALA */
+    padding-bottom:20px;         /* Altına biraz boşluk */
+    margin-bottom:80px;         /* Çizginin altına boşluk */
+}
+
+/* YENİ EKLENDİ: Merhaba yazısını aşağı itmek için */
+.welcome-text {
+    margin-top: 30px; /* Başlıktaki 80px boşluğa EK olarak 30px daha boşluk ekler */
+    font-size: 1.1rem; /* Yazıyı biraz büyütelim */
+}
+
+/* Metin giriş kutusunun görünümünü iyileştir */
+.stTextInput > div > div > input {
+    font-size: 1.1rem;
+    padding-top: 10px;
+    padding-bottom: 10px;
 }
 </style>
+
 <h1>🎵 Şarkı Sözlerinden Şarkı Bulma Chatbot'u 🎵</h1>
 """, unsafe_allow_html=True)
 
-st.markdown("Merhaba, nasıl yardımcı olabilirim?")
+# DEĞİŞTİ: 'Merhaba...' satırını da st.markdown içine alıp sınıfı uyguluyoruz
+st.markdown('<p class="welcome-text">Merhaba, nasıl yardımcı olabilirim?</p>', unsafe_allow_html=True)
 
 # --- Ana Uygulama Mantığı ---
-# Bu 'try-except' bloğu, RAG zinciri yüklenirken veya çalışırken
-# (örn: bozuk veritabanı, yanlış API anahtarı) oluşabilecek
-# herhangi bir hatayı yakalar ve uygulamanın çökmesini engeller.
 try:
     # ADIM 1: RAG zincirini yükle.
-    # (Bu fonksiyon @st.cache_resource sayesinde sadece ilk seferde
-    # gerçekten çalışır, sonraki seferlerde hafızadan (cache) çağrılır.)
     chain = load_rag_chain()
     
     # ADIM 2: Kullanıcıdan soru almak için bir metin giriş kutusu oluştur.
-    user_question = st.text_input("Bulmak istediğiniz şarkı sözünü yazın:")
+    # YENİ EKLENDİ: 'placeholder' (silik örnek metin) eklendi
+    user_question = st.text_input(
+        "Hadi bana bulmak istediğin şarkının sözlerini söyle...",
+        placeholder=""
+    )
+    
+    # YENİ EKLENDİ: Örnek soruları gösteren bir alt başlık
+    st.caption("Örnek kullanım: 'Aşkın kazanması için ayrı gitme' sözü geçen şarkı hangisi, kim söylüyor ve türü nedir?")
 
     # ADIM 3: Eğer kullanıcı bir soru yazıp 'Enter'a bastıysa...
     if user_question:
@@ -176,22 +190,15 @@ try:
         # animasyon otomatik olarak kaybolur.
         
         # ADIM 4: Gelen cevabı kontrol et.
-        # Bu, RAG prompt'umuzdaki ('Bu konuda bilgim yok.') kuralı
-        # yakalamak için çok önemli bir kullanıcı deneyimi (UX) adımıdır.
         if "Bu konuda bilgim yok" in cevap:
             # Başarısızlık durumu: LLM bir şey bulamadı.
-            # st.error: Kırmızı bir hata kutusu gösterir.
             st.error("Üzgünüm bulamadım. Farklı bir söz dizisi deneyebilirsin.")
         else:
             # Başarı durumu: LLM bir cevap buldu.
-            # st.success: Yeşil bir başarı kutusu gösterir.
             st.success("İşte buldum!") 
-            # st.markdown: Cevabı kalın (**) olarak ekrana basar.
             st.markdown(f"**Cevap:** {cevap}")
 
 except Exception as e:
     # 'load_rag_chain' veya 'chain.invoke' sırasında bir hata oluşursa
-    # (örn: veritabanı bozuksa, API anahtarı geçersizse),
-    # bu blok çalışır ve kullanıcıya net bir hata mesajı gösterir.
     st.error(f"Bir hata oluştu: {e}")
     st.error("Lütfen 'chroma_db' klasörünün doğru yerde olduğundan veya API anahtarınızın doğru olduğundan emin olun.")
