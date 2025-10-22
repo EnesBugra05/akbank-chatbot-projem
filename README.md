@@ -58,13 +58,11 @@ Uygulamanın kullanımı oldukça basittir:
 
 **Ekran Görüntüleri:**
 
-*(Unutma: Aşağıdaki `images/...` yollarını kendi dosya adlarınla değiştirmen ve resimleri `images` klasörüne koyman lazım)*
-
 *Uygulamanın İlk Açılış Ekranı:*
-![Ana Ekran](images/ilk-görüntü.png)
+![Ana Ekran](images/arama-yapıyor.png)
 
 *Sorgu Girişi Örneği:*
-![Sorgu Girişi](images/arama-yapıyor.png)
+![Sorgu Girişi](images/ilk-görüntü.png)
 
 *Başarılı Cevap Örneği:*
 ![Başarılı Cevap](images/şarkıyı-buldu-çıktı-verdi.png)
@@ -75,8 +73,6 @@ Uygulamanın kullanımı oldukça basittir:
 ![Bulunamadı Mesajı](images/şarkı-bulunamadı.png)
 
 ---
-
-*(İsteğe Bağlı Bölüm: Kurulum ve Lokal Çalıştırma)*
 
 ### Kurulum ve Çalıştırma (Lokal)
 
