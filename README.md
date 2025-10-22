@@ -53,7 +53,7 @@ Uygulamanın canlı haline aşağıdaki linkten erişebilirsiniz:
 ### Örnek Kullanım
 
 Uygulamanın kullanımı oldukça basittir:
-1.  Ortadaki metin kutusuna bulmak istediğiniz şarkı sözünü yazın ve Enter'a basın.
+1.  Örnek kullanımdaki yazı örneğini referans alarak aramak istediğiniz şarkı sözlerini ekleyip Enter tuşuna basın
 2.  Chatbot, veritabanında ilgili şarkıyı arayacak ve bulursa sonucunu gösterecektir.
 
 **Ekran Görüntüleri:**
